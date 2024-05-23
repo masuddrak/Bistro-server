@@ -3,7 +3,7 @@ const app = express()
 const port = process.env.PORT || 5000
 const cors = require('cors');
 require('dotenv').config()
-
+const jwt = require('jsonwebtoken');
 
 // midelware
 app.use(cors())
@@ -29,27 +29,51 @@ async function run() {
         const bristroCollection = client.db("BistroDB").collection("menu");
         const cartsCollection = client.db("BistroDB").collection("carts");
         const usersCollection = client.db("BistroDB").collection("users");
-
-        // create user role
-        app.patch("/users/admin/:id",async(req,res)=>{
-            const id=req.params.id
-            const filter={_id:new ObjectId(id)}
-            const updateDoc={
-                $set:{role:"admin"}
+        // apo jwt related
+        app.post("/jwt", async (req, res) => {
+            const user = req.body
+            console.log(user)
+            const token = jwt.sign(user, process.env.ACCE_TOKEN, { expiresIn: "2h" })
+            res.send({ token })
+        })
+        // verifytoken
+        const verifyTOken = (req, res, next) => {
+            const getToken = req.headers.authorization
+            console.log("token....hjhj.",getToken)
+            if (!req.headers.authorization) {
+                return res.status(401).send({ message: "unauthorize access" })
             }
-            const result =await usersCollection.updateOne(filter,updateDoc)
+            const token = req.headers.authorization.split(" ")[1]
+
+            jwt.verify(token, process.env.ACCE_TOKEN, function (err, decoded) {
+                if(err){
+                    return res.status(401).send({ message: "unauthorize access" })
+                }
+                req.decoded=decoded
+                next()
+            });
+            
+        }
+        // create user role
+        app.patch("/users/admin/:id", async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: { role: "admin" }
+            }
+            const result = await usersCollection.updateOne(filter, updateDoc)
             res.send(result)
         })
         // get all users
-        app.get("/users",async(req,res)=>{
-            const result =await usersCollection.find().toArray()
+        app.get("/users", verifyTOken, async (req, res) => {
+            const result = await usersCollection.find().toArray()
             res.send(result)
         })
         // delete user
-        app.delete("/users/:id",async(req,res)=>{
-            const id=req.params.id
-            const query={_id:new ObjectId(id)}
-            const result =await usersCollection.deleteOne(query)
+        app.delete("/users/:id", async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await usersCollection.deleteOne(query)
             res.send(result)
         })
         //   create user info db
