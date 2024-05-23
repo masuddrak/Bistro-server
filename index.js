@@ -12,7 +12,7 @@ app.use(express.json())
 // database
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.kaocfbi.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -28,22 +28,62 @@ async function run() {
     try {
         const bristroCollection = client.db("BistroDB").collection("menu");
         const cartsCollection = client.db("BistroDB").collection("carts");
+        const usersCollection = client.db("BistroDB").collection("users");
 
-        // Create All Route
+        // create user role
+        app.patch("/users/admin/:id",async(req,res)=>{
+            const id=req.params.id
+            const filter={_id:new ObjectId(id)}
+            const updateDoc={
+                $set:{role:"admin"}
+            }
+            const result =await usersCollection.updateOne(filter,updateDoc)
+            res.send(result)
+        })
+        // get all users
+        app.get("/users",async(req,res)=>{
+            const result =await usersCollection.find().toArray()
+            res.send(result)
+        })
+        // delete user
+        app.delete("/users/:id",async(req,res)=>{
+            const id=req.params.id
+            const query={_id:new ObjectId(id)}
+            const result =await usersCollection.deleteOne(query)
+            res.send(result)
+        })
+        //   create user info db
+        app.post("/users", async (req, res) => {
+            const user = req.body
+            const query = { email: user?.email }
+            const existUser = await usersCollection.findOne(query)
+            if (existUser) {
+                return res.status(401).send("You Have Accounte")
+            }
+            const result = await usersCollection.insertOne(user)
+            res.send(result)
+        })
         // Get All Menu
         app.get("/menu", async (req, res) => {
             const result = await bristroCollection.find().toArray()
             res.send(result)
         })
         // Post Cart
-        app.post("/carts",async(req,res)=>{
+        app.post("/carts", async (req, res) => {
             const result = await cartsCollection.insertOne(req.body);
             res.send(result)
         })
         // get carts
-        app.get("/carts",async(req,res)=>{
-            const email=req.query.email
-            const result=await cartsCollection.find({orderEmail:email}).toArray()
+        app.get("/carts", async (req, res) => {
+            const email = req.query.email
+            const result = await cartsCollection.find({ orderEmail: email }).toArray()
+            res.send(result)
+        })
+        // delet cats items
+        app.delete("/deleteCart/:id", async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await cartsCollection.deleteOne(query)
             res.send(result)
         })
 
