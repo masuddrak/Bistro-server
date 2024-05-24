@@ -26,34 +26,62 @@ const client = new MongoClient(uri, {
 
 async function run() {
     try {
-        const bristroCollection = client.db("BistroDB").collection("menu");
+        
         const cartsCollection = client.db("BistroDB").collection("carts");
         const usersCollection = client.db("BistroDB").collection("users");
+        const menusCollection = client.db("BistroDB").collection("menu");
         // apo jwt related
         app.post("/jwt", async (req, res) => {
             const user = req.body
-            console.log(user)
+            // console.log(user)
             const token = jwt.sign(user, process.env.ACCE_TOKEN, { expiresIn: "2h" })
             res.send({ token })
         })
+      
         // verifytoken
         const verifyTOken = (req, res, next) => {
             const getToken = req.headers.authorization
-            console.log("token....hjhj.",getToken)
+            // console.log("token....hjhj.", getToken)
             if (!req.headers.authorization) {
                 return res.status(401).send({ message: "unauthorize access" })
             }
             const token = req.headers.authorization.split(" ")[1]
 
             jwt.verify(token, process.env.ACCE_TOKEN, function (err, decoded) {
-                if(err){
+                if (err) {
                     return res.status(401).send({ message: "unauthorize access" })
                 }
-                req.decoded=decoded
+                req.decoded = decoded
                 next()
             });
-            
+
         }
+          // admin verify
+          const adminVerify = async (req, res, next) => {
+            const email = req.decoded.email
+            const query = { email: email }
+            const user = await usersCollection.findOne(query)
+            const isAdmin = user?.role === "admin"
+            if (!isAdmin) {
+                return res.status(403).send({ message: "Forbiden access" })
+            } 
+            next()
+        }
+        //  user verify
+        app.get("/users/admin/:email", verifyTOken, async (req, res) => {
+            const email = req.params.email
+            // console.log("hhhhhhhh", email)
+            if (email !== req?.decoded?.email) {
+                return res.status(403).send({ message: "forbident.. access" })
+            }
+            const query = { email: email }
+            const user = await usersCollection.findOne(query)
+            let isAdmin = false
+            if (user) {
+                isAdmin = user?.role === "admin"
+            }
+            res.send({ isAdmin })
+        })
         // create user role
         app.patch("/users/admin/:id", async (req, res) => {
             const id = req.params.id
@@ -65,7 +93,7 @@ async function run() {
             res.send(result)
         })
         // get all users
-        app.get("/users", verifyTOken, async (req, res) => {
+        app.get("/users", verifyTOken,adminVerify, async (req, res) => {
             const result = await usersCollection.find().toArray()
             res.send(result)
         })
@@ -89,7 +117,13 @@ async function run() {
         })
         // Get All Menu
         app.get("/menu", async (req, res) => {
-            const result = await bristroCollection.find().toArray()
+            const result = await menusCollection.find().toArray()
+            res.send(result)
+        })
+        app.post("/add_menu",verifyTOken,adminVerify,async(req,res)=>{
+            const item=req.body
+            console.log(item)
+            const result=await menusCollection.insertOne(item)
             res.send(result)
         })
         // Post Cart
