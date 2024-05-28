@@ -1,9 +1,12 @@
 const express = require('express');
 const app = express()
-const port = process.env.PORT || 5000
 const cors = require('cors');
 require('dotenv').config()
 const jwt = require('jsonwebtoken');
+
+const stripe = require("stripe")(process.env.PAYMENT_SECRET);
+
+const port = process.env.PORT || 5000
 
 // midelware
 app.use(cors())
@@ -128,22 +131,22 @@ async function run() {
             res.send(result)
         })
         // get a single menu
-        app.get("/menu/:id",async (req, res) => {
+        app.get("/menu/:id", async (req, res) => {
             const id = req.params.id
-            const filter = {_id:new ObjectId(id)}
+            const filter = { _id: new ObjectId(id) }
             const result = await menusCollection.findOne(filter)
             console.log(result)
             res.send(result)
         })
         // update a single menu
-        app.patch("/update_menu/:id",async (req, res) => {
+        app.patch("/update_menu/:id", async (req, res) => {
             const id = req.params.id
-            const item=req.body
-            const filter = { _id:new ObjectId(id)}
-            const updateDoc={
-                $set:{...item}
+            const item = req.body
+            const filter = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: { ...item }
             }
-            const result = await menusCollection.updateOne(filter,updateDoc)
+            const result = await menusCollection.updateOne(filter, updateDoc)
             res.send(result)
         })
         // save a menu
@@ -170,6 +173,28 @@ async function run() {
             const result = await cartsCollection.deleteOne(query)
             res.send(result)
         })
+
+
+
+
+
+        // apyment intent
+        app.post("/create-payment-intent", async (req, res) => {
+            const { price } = req.body;
+            const amount = parseInt(price * 100)
+         
+            // Create a PaymentIntent with the order amount and currency
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+                payment_method_types: ["card"],
+            });
+
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        });
 
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
