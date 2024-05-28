@@ -206,7 +206,7 @@ async function run() {
 
             res.send({ paymentResult, deleteCards })
         })
-        app.get("/payment/:email",verifyTOken, async (req, res) => {
+        app.get("/payment/:email", verifyTOken, async (req, res) => {
             const email = req.params.email
             const query = { email }
             if (email !== req.decoded.email) {
@@ -216,9 +216,45 @@ async function run() {
             console.log(result)
             res.send(result)
         })
+        // adminn ststs
+        app.get("/adminStats", async (req, res) => {
+            const totalMenus = await menusCollection.estimatedDocumentCount()
+            const totalUsers = await usersCollection.estimatedDocumentCount()
+            const totalOrders = await paymentCollection.estimatedDocumentCount()
+            // total revenu
+            const result = await paymentCollection.aggregate([
+                {
+                    $group: {
+                        _id: null,
+                        totalRevenue: { $sum: "$price" }
+                    }
+                }
+            ]).toArray()
+            const revenue = result.length > 0 ? result[0].totalRevenue : 0
+            res.send({
+                totalMenus,
+                totalUsers,
+                totalOrders,
+                revenue
+            })
+        })
 
-
-
+        // order ststs
+        app.get("/orderStats", async (req, res) => {
+            const result = await paymentCollection.aggregate([
+                {$unwind:"$menuIds"},
+                {
+                    $lookup:{
+                        from:"menu",
+                        localField:"menuIds",
+                        foreignField:"_id",
+                        as:"menuItems"
+                    }
+                },
+            
+            ]).toArray()
+            res.send(result)
+        })
 
 
 
