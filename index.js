@@ -33,6 +33,7 @@ async function run() {
         const cartsCollection = client.db("BistroDB").collection("carts");
         const usersCollection = client.db("BistroDB").collection("users");
         const menusCollection = client.db("BistroDB").collection("menu");
+        const paymentCollection = client.db("BistroDB").collection("payments");
         // apo jwt related
         app.post("/jwt", async (req, res) => {
             const user = req.body
@@ -178,11 +179,11 @@ async function run() {
 
 
 
-        // apyment intent
+        // apyment intent-------------------------------------------------------
         app.post("/create-payment-intent", async (req, res) => {
             const { price } = req.body;
             const amount = parseInt(price * 100)
-         
+
             // Create a PaymentIntent with the order amount and currency
             const paymentIntent = await stripe.paymentIntents.create({
                 amount: amount,
@@ -195,6 +196,31 @@ async function run() {
                 clientSecret: paymentIntent.client_secret,
             });
         });
+
+        app.post("/payment", async (req, res) => {
+            const payment = req.body
+            const paymentResult = await paymentCollection.insertOne(payment)
+            // delete carts item for each item
+            const query = { _id: { $in: payment.cardIds.map(id => new ObjectId(id)) } }
+            const deleteCards = await cartsCollection.deleteMany(query)
+
+            res.send({ paymentResult, deleteCards })
+        })
+        app.get("/payment/:email",verifyTOken, async (req, res) => {
+            const email = req.params.email
+            const query = { email }
+            if (email !== req.decoded.email) {
+                return res.status(403).send({ message: "forbiden Access" })
+            }
+            const result = await paymentCollection.find(query).toArray()
+            console.log(result)
+            res.send(result)
+        })
+
+
+
+
+
 
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
