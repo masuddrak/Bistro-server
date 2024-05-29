@@ -240,23 +240,49 @@ async function run() {
         })
 
         // order ststs
-        app.get("/orderStats", async (req, res) => {
-            const result = await paymentCollection.aggregate([
-                {$unwind:"$menuIds"},
-                {
-                    $lookup:{
-                        from:"menu",
-                        localField:"menuIds",
-                        foreignField:"_id",
-                        as:"menuItems"
+        app.get("/orderStats",verifyTOken,adminVerify, async (req, res) => {
+            const result = await paymentCollection
+                .aggregate([
+                    {
+                        $unwind: "$menuIds",
+                    },
+                    {
+                        $addFields: {
+                            menuItemObjectId: { $toObjectId: "$menuIds" },
+                        },
+                    },
+                    {
+                        $lookup: {
+                            from: "menu",
+                            localField: "menuItemObjectId",
+                            foreignField: "_id",
+                            as: "menuItems",
+                        },
+                    },
+                    {
+                        $unwind:"$menuItems"
+                    },
+                    {
+                        $group:{
+                            _id:"$menuItems.category",
+                            quantity:{$sum:1},
+                            revenue:{$sum:"$menuItems.price"}
+                        }
+                    },
+                    {
+                        $project:{
+                            _id:0,
+                            category:"$_id",
+                            quantity:"$quantity",
+                            revenue:"$revenue"
+                        }
                     }
-                },
-            
-            ]).toArray()
-            res.send(result)
+                ])
+                .toArray();
+                res.send(result)
         })
 
-
+        
 
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
